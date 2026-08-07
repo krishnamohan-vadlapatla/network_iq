@@ -26,7 +26,7 @@ The current MVP provides a robust simulation environment where multi-agent negot
 
 ## Guiding Principles
 1. **Never Violate the Math:** LLMs cannot be trusted with raw arithmetic. All profitability and capacity calculations are strictly enforced by deterministic Python algorithms before the LLM can finalize a decision.
-2. **Compute matches Value:** Never spend ₹2 on an API call to save ₹1. Inference costs are aggressively optimized.
+2. **Compute matches Value:** Never spend ₹2 on an API call to save ₹1. Inference costs are aggressively optimized via tiered reasoning.
 3. **Transparency over Black Boxes:** A planner must be able to read and understand exactly *why* the AI recommended a massive transfer. Explainability is a hard requirement.
 
 ---
@@ -38,7 +38,36 @@ The current MVP provides a robust simulation environment where multi-agent negot
 
 ---
 
-## Product Flow
+## Product Flow & Data Architecture
+
+```mermaid
+sequenceDiagram
+    participant D as Data Layer
+    participant O as Orchestrator
+    participant R as Region Agents
+    participant N as Negotiation
+    participant G as Guardrail
+    participant S as Self-Check
+    participant H as Human Planner
+    
+    D->>O: Load & enrich data
+    O->>R: Dispatch to 4 region agents
+    R->>R: Forecast demand (tiered)
+    R->>R: Compute placement (EOQ/SS)
+    R->>R: Propose transfers
+    R->>N: Submit proposals
+    N->>N: Resolve conflicts (auction)
+    N->>G: Validate transfers
+    G->>G: Cost guardrail check
+    G->>G: Capacity feasibility
+    G-->>H: Flag bulk transfers >₹5K
+    G->>S: Run self-check
+    S->>S: Compare vs business goals
+    S->>O: Return final plan
+    H-->>O: Approve / Override
+    O->>O: Generate audit logs
+```
+
 1. **Data Ingestion:** The system pulls live stock levels and demand forecasts.
 2. **Deficit/Surplus Identification:** Regional agents independently identify inventory imbalances.
 3. **Agent Negotiation:** Agents communicate via the Orchestrator, proposing transfers and bidding on holding/transfer costs.
@@ -56,8 +85,69 @@ Every single proposed transfer is rigorously evaluated through a three-stage fun
 
 ---
 
-## AI-Agent Design
-The core architecture completely avoids the brittle "mega-prompt" paradigm, utilizing a distributed LangGraph state machine:
+## AI-Agent Design & System Architecture
+
+The core architecture completely avoids the brittle "mega-prompt" paradigm, utilizing a distributed LangGraph state machine.
+
+```mermaid
+graph TB
+    subgraph DataLayer["📦 Data Layer"]
+        CSV["Indian Store Data CSV<br/>20K+ rows, 2019-2023"]
+        SYN["Synthesized Data<br/>Transfer costs, capacities,<br/>lead times"]
+    end
+
+    subgraph AgentLayer["🤖 Multi-Agent System (LangGraph)"]
+        ORCH["🎯 Orchestrator Agent<br/>Global Coordinator"]
+        
+        subgraph RegionAgents["Region Negotiator Agents"]
+            RA_S["🏭 South Agent"]
+            RA_W["🏭 West Agent"]
+            RA_E["🏭 East Agent"]
+            RA_C["🏭 Central Agent"]
+        end
+        
+        subgraph Subagents["Specialized Subagents"]
+            DF["📈 Demand Forecaster<br/>XGBoost / HW / SMA"]
+            PO["📋 Placement Optimizer<br/>EOQ + Safety Stock"]
+            TO["🔄 Transfer Optimizer<br/>Cost-Benefit + ROI"]
+        end
+        
+        NEG["🤝 Negotiation Protocol<br/>Contract-Net / Auction"]
+        GR["🛡️ Guardrail Agent<br/>Cost + Capacity + Approval"]
+        SC["✅ Self-Check Module<br/>Business Goal Validation"]
+        AUD["📝 Audit Module<br/>Chain-of-Thought Logs"]
+    end
+
+    subgraph TieredReasoning["⚡ Tiered Reasoning Engine"]
+        LLM["🧠 A-Class: LLM Reasoning<br/>(Gemini / GPT-4o)"]
+        ML["📊 B-Class: ML Models<br/>(XGBoost / Holt-Winters)"]
+        RULE["⚙️ C-Class: Rule Engine<br/>(SMA / Heuristics)"]
+    end
+
+    subgraph UILayer["🖥️ Planner Dashboard (Streamlit)"]
+        DASH["Executive Metrics"]
+        INBOX["Approval Inbox<br/>Human-in-the-Loop"]
+        AUDIT_UI["Audit Trail<br/>Explainability"]
+        BENCH_UI["Benchmark Results"]
+    end
+
+    CSV --> ORCH
+    SYN --> ORCH
+    ORCH --> RA_S & RA_W & RA_E & RA_C
+    RA_S & RA_W & RA_E & RA_C --> DF & PO & TO
+    DF & PO & TO --> NEG
+    NEG --> GR
+    GR --> SC
+    SC --> AUD
+    AUD --> INBOX
+    
+    RA_S & RA_W & RA_E & RA_C -.-> LLM & ML & RULE
+    
+    ORCH --> DASH
+    GR --> INBOX
+    AUD --> AUDIT_UI
+```
+
 - **Regional Negotiator Agents:** Each real-world node operates as an independent agent handling its localized inventory state.
 - **The Orchestrator:** Acts as the network's global broker, coordinating multi-node negotiations and finding the lowest-cost transfer paths.
 - **The Guardrail & Auditor Agent:** Generates natural-language chain-of-thought justifications and enforces deterministic constraints.
