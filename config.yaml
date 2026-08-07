@@ -1,0 +1,111 @@
+# ============================================================
+# NetworkIQ Inventory Optimizer — Central Configuration
+# ============================================================
+# All tunable parameters in one place. Override via environment
+# variables prefixed with NIQ_ (e.g. NIQ_RANDOM_SEED=123).
+
+project:
+  name: "NetworkIQ Inventory Optimizer"
+  version: "1.0.0"
+  description: "AI-driven multi-agent inventory optimization for Indian retail networks"
+
+# ------ Reproducibility ------
+random_seed: 42
+
+# ------ SKU Classification (ABC Analysis) ------
+sku_tiers:
+  # Cumulative revenue share thresholds
+  a_class_threshold: 0.20   # Top 20 % of SKUs by revenue
+  b_class_threshold: 0.50   # Next 30 % (cumulative 50 %)
+  # Remaining 50 % → C-class
+
+# ------ Tiered Reasoning ------
+reasoning:
+  a_class_model: "gemini"          # LLM for deep reasoning
+  b_class_model: "xgboost"        # ML model
+  c_class_model: "rule_based"     # Simple heuristics
+  # Estimated cost per decision (₹)
+  a_class_cost: 3.50
+  b_class_cost: 0.30
+  c_class_cost: 0.10
+
+# ------ LLM Configuration ------
+llm:
+  provider: "google"              # google | openai | anthropic | groq | mock
+  google:
+    model: "gemini-2.0-flash"
+    temperature: 0.3
+    max_tokens: 1024
+  openai:
+    model: "gpt-4o"
+    temperature: 0.3
+    max_tokens: 1024
+  mock:
+    enabled: true                  # Use mock LLM if no API key
+
+# ------ Optimization Parameters ------
+optimization:
+  planning_horizon_weeks: 12
+  holding_cost_rate: 0.02          # 2 % of item value per week
+  lost_sale_penalty_multiplier: 2.5
+  service_level_target: 0.95       # 95 % target
+  safety_stock_z_score: 1.65       # Corresponds to ~95 % service level
+  max_negotiation_rounds: 3
+
+# ------ Transfer & Approval ------
+transfers:
+  approval_threshold_inr: 5000    # Bulk transfers above this need planner sign-off
+  cost_guardrail: true            # Reject if transfer_cost >= margin_unlocked
+  max_transfer_pct_of_stock: 0.40 # Never transfer > 40 % of source stock
+
+# ------ Capacity Profiles (units) ------
+capacity:
+  South:
+    total_units: 15000
+    cold_chain_units: 2000
+  West:
+    total_units: 18000
+    cold_chain_units: 2500
+  East:
+    total_units: 12000
+    cold_chain_units: 1500
+  Central:
+    total_units: 14000
+    cold_chain_units: 1800
+
+# ------ Transfer Cost Matrix (₹ per unit) ------
+transfer_costs:
+  South-West: 45
+  South-East: 65
+  South-Central: 55
+  West-East: 70
+  West-Central: 40
+  East-Central: 50
+
+# ------ Lead Time Matrix (days) ------
+lead_times:
+  South-West: 3
+  South-East: 4
+  South-Central: 3
+  West-East: 4
+  West-Central: 2
+  East-Central: 3
+
+# ------ Simulation / Benchmarking ------
+benchmark:
+  horizon_weeks: 12
+  demand_shock_probability: 0.15   # 15 % chance per week per SKU
+  demand_shock_magnitude: 0.50     # ±50 % demand swing
+  lead_time_disruption_prob: 0.10  # 10 % chance of +2 day delay
+  num_simulations: 5               # Monte Carlo runs
+  strategies:
+    - "or_only"
+    - "ai_only"
+    - "or_to_ai"
+    - "ai_to_or"
+
+# ------ Streamlit UI ------
+ui:
+  page_title: "NetworkIQ Command Center"
+  theme: "dark"
+  refresh_interval_sec: 30
